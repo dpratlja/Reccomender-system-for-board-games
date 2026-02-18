@@ -73,12 +73,14 @@ class DataPreprocessor:
 
     def train_test_split(self, data_entries, test_size=0.2, seed=42):
         np.random.seed(seed)
-        data_entries = np.array(data_entries)
-        np.random.shuffle(data_entries)
+
+        data_entries = list(data_entries)  # osiguraj da je lista
+        np.random.shuffle(data_entries)    # shuffle radi i na listama
 
         n_test = int(len(data_entries) * test_size)
+
         test_entries = data_entries[:n_test]
         train_entries = data_entries[n_test:]
 
-        return train_entries.tolist(), test_entries.tolist()
+        return train_entries, test_entries
 
