@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
+import os
 
 class TensorRecommend:
-    def __init__(self, k, lambda_, eta, data_entries, num_users, num_items, num_features, seed=42):
+    def __init__(self, k, lambda_, eta, data_entries, num_users, num_items, num_features, seed=42, loading=False):
         """
         k: latentna dimenzija
         lambda_: regularizacija
@@ -25,14 +26,18 @@ class TensorRecommend:
             feature_sizes = num_features
 
         self.num_features = len(feature_sizes)
-
-        # Latentni faktori
-        self.U = np.random.uniform(0,2, size=(num_users, k))
-        self.M = np.random.uniform(0,2, size=(num_items, k))
-        self.C = [np.random.uniform(0,2, size=(n, k)) for n in feature_sizes]
-
-        # Tensor S dimenzija k x k x k x ... (2 + broj featurea)
-        self.S = np.random.uniform(0,2, size=(k,) * (2 + self.num_features))
+        if loading:
+            self.U = np.load(os.path.join(os.path.dirname(os.getcwd()),"U_matrix.npy"))
+            self.M = np.load(os.path.join(os.path.dirname(os.getcwd()),"M_matrix.npy"))
+            self.C = [np.load(os.path.join(os.path.dirname(os.getcwd()),f"C_matrix_{i}.npy")) for i in range(self.num_features)]
+            self.S = np.load(os.path.join(os.path.dirname(os.getcwd()),"S_tensor.npy"))
+        else:
+            # Latentni faktori
+            self.U = np.random.uniform(0,2, size=(num_users, k))
+            self.M = np.random.uniform(0,2, size=(num_items, k))
+            self.C = [np.random.uniform(0,2, size=(n, k)) for n in feature_sizes]
+            # Tensor S dimenzija k x k x k x ... (2 + broj featurea)
+            self.S = np.random.uniform(0,2, size=(k,) * (2 + self.num_features))
 
     def predict(self, entry):
         """
@@ -60,9 +65,9 @@ class TensorRecommend:
         for C_i in self.C:
             reg += np.sum(C_i**2)
         reg += np.sum(self.S**2)
-
+        loss_nr = loss
         loss += self.lambda_ * reg
-        return loss
+        return loss_nr, loss
 
     def _clip_grad(self, grad, max_norm):
         norm = np.linalg.norm(grad)
@@ -141,9 +146,16 @@ class TensorRecommend:
 
             self.S -= eta * grad_S
 
-        loss = self.compute_loss()
-        print(f"Epoch Loss: {loss:.4f}")
+        loss_nr, loss = self.compute_loss()
+        print(f"Epoch Loss: {loss:.4f}, NR Loss: {loss_nr:.4f}, avg error: {np.sqrt(loss_nr/len(self.data_entries)):.4f}")
 
         return t
+
+    def save_model(self, path):
+        np.save(os.path.join(path,"U_matrix.npy"), self.U)
+        np.save(os.path.join(path,"M_matrix.npy"), self.M)
+        for i, C_i in enumerate(self.C):
+            np.save(os.path.join(path,f"C_matrix_{i}.npy"), C_i)
+        np.save(os.path.join(path,"S_tensor.npy"), self.S)
 
 
