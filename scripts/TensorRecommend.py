@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 class TensorRecommend:
-    def __init__(self, k, lambda_, eta, data_entries, num_users, num_items, num_features, seed=42, loading=False):
+    def __init__(self, k, lambda_, eta, data_entries, num_users, num_items, num_features, seed=42, loading=False,path=None):
         """
         k: latentna dimenzija
         lambda_: regularizacija
@@ -27,10 +27,10 @@ class TensorRecommend:
 
         self.num_features = len(feature_sizes)
         if loading:
-            self.U = np.load(os.path.join(os.path.dirname(os.getcwd()),"U_matrix.npy"))
-            self.M = np.load(os.path.join(os.path.dirname(os.getcwd()),"M_matrix.npy"))
-            self.C = [np.load(os.path.join(os.path.dirname(os.getcwd()),f"C_matrix_{i}.npy")) for i in range(self.num_features)]
-            self.S = np.load(os.path.join(os.path.dirname(os.getcwd()),"S_tensor.npy"))
+            self.U = np.load(os.path.join(os.path.dirname(os.getcwd()),path,"U_matrix.npy"))
+            self.M = np.load(os.path.join(os.path.dirname(os.getcwd()),path,"M_matrix.npy"))
+            self.C = [np.load(os.path.join(os.path.dirname(os.getcwd()),path,f"C_matrix_{i}.npy")) for i in range(self.num_features)]
+            self.S = np.load(os.path.join(os.path.dirname(os.getcwd()),path,"S_tensor.npy"))
         else:
             # Latentni faktori
             self.U = np.random.uniform(0,2, size=(num_users, k))
