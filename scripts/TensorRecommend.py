@@ -50,7 +50,6 @@ class TensorRecommend:
         n_dims = len(vecs)
         subscripts = ''.join([chr(ord('p') + i) for i in range(n_dims)])
         einsum_str = f"{subscripts},{','.join(subscripts)}->"
-
         return np.einsum(einsum_str, self.S, *vecs)
 
     def compute_loss(self):
@@ -157,5 +156,20 @@ class TensorRecommend:
         for i, C_i in enumerate(self.C):
             np.save(os.path.join(path,f"C_matrix_{i}.npy"), C_i)
         np.save(os.path.join(path,"S_tensor.npy"), self.S)
+
+    def top_games(self, user_name, top_n=10):
+        scores = []
+        for m_idx in range(self.M.shape[0]):
+            for i in self.data_entries:
+                if i[1] == m_idx:
+                    entry = (user_name, m_idx, *i[2:-1], 0)  # rating se ne koristi u predikciji
+                    print(entry)
+                    score = self.predict(entry)
+                    scores.append((m_idx, score))
+                    break
+        #prvih top_n igara
+        scores.sort(key=lambda x: x[1], reverse=True)
+        return scores[:top_n]
+
 
 
