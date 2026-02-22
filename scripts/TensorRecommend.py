@@ -18,6 +18,11 @@ class TensorRecommend:
         self.lambda_ = lambda_
         self.eta = eta
         self.data_entries = data_entries
+        self.item_features = {}
+        for entry in self.data_entries:
+            _, m_idx, *feature_indices, _ = entry
+            if m_idx not in self.item_features:
+                self.item_features[m_idx] = feature_indices
 
         # Ako je dict, uzmemo samo veličine
         if isinstance(num_features, dict):
@@ -157,19 +162,68 @@ class TensorRecommend:
             np.save(os.path.join(path,f"C_matrix_{i}.npy"), C_i)
         np.save(os.path.join(path,"S_tensor.npy"), self.S)
 
-    def top_games(self, user_name, top_n=10):
+    def top_games(self, user_vec, top_n=10):
         scores = []
+
         for m_idx in range(self.M.shape[0]):
-            for i in self.data_entries:
-                if i[1] == m_idx:
-                    entry = (user_name, m_idx, *i[2:-1], 0)  # rating se ne koristi u predikciji
-                    print(entry)
-                    score = self.predict(entry)
-                    scores.append((m_idx, score))
-                    break
-        #prvih top_n igara
+
+            if m_idx not in self.item_features:
+                continue
+
+            feature_indices = self.item_features[m_idx]
+
+            vecs = [user_vec, self.M[m_idx]]
+            vecs += [self.C[i][f_idx] for i, f_idx in enumerate(feature_indices)]
+
+            subscripts = ''.join([chr(ord('p') + i) for i in range(len(vecs))])
+            einsum_str = f"{subscripts},{','.join(subscripts)}->"
+
+            score = np.einsum(einsum_str, self.S, *vecs)
+
+            scores.append((m_idx, score))
+
         scores.sort(key=lambda x: x[1], reverse=True)
         return scores[:top_n]
 
+    def fit_new_user(self, user_ratings, epochs=50, lr=0.01, max_norm=5.0):
+        """
+        user_ratings: lista tupleova
+        [(m_idx, f1_idx, f2_idx, ..., rating)]
+        """
 
+        u_vec = np.random.uniform(0, 2, size=self.k)
+
+        for _ in range(epochs):
+            for entry in user_ratings:
+                m_idx, *feature_indices, r = entry
+
+                vecs = [u_vec, self.M[m_idx]]
+                vecs += [self.C[i][f_idx] for i, f_idx in enumerate(feature_indices)]
+
+                # predikcija
+                subscripts = ''.join([chr(ord('p') + i) for i in range(len(vecs))])
+                einsum_str = f"{subscripts},{','.join(subscripts)}->"
+                pred = np.einsum(einsum_str, self.S, *vecs)
+
+                err = pred - r
+
+                # gradijent za u_vec
+                indices = [chr(ord('a') + i) for i in range(len(vecs))]
+                S_subs = ''.join(indices)
+
+                other_indices = indices[1:]
+                einsum_str = f"{S_subs},{','.join(other_indices)}->a"
+
+                grad_u = err * np.einsum(
+                    einsum_str,
+                    self.S,
+                    *vecs[1:]
+                )
+
+                grad_u += self.lambda_ * u_vec
+                grad_u = self._clip_grad(grad_u, max_norm)
+
+                u_vec -= lr * grad_u
+
+        return u_vec
 
