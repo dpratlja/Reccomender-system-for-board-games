@@ -166,7 +166,7 @@ class TensorRecommend:
             np.save(os.path.join(path,f"C_matrix_{i}.npy"), C_i)
         np.save(os.path.join(path,"S_tensor.npy"), self.S)
 
-    # Preporuka top N igara za danog korisnika (dani vektor korisnika)
+    # POPRAVI, TOTALNO KRIVO
     def top_games(self, user_vec, top_n=10):
         scores = []
 

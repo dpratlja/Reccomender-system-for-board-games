@@ -6,6 +6,7 @@ class DataPreprocessor:
     def __init__(self, games_info, bgg_reviews):
         self.games_info = games_info
         self.bgg_reviews = bgg_reviews
+        self.idx2game = None
     #merging datasets with inner join on 'ID' column, optionally only with selected features from games_info dataset, and returning merged dataframe
     def merge_datasets(self, featires_to_add=None):
 
@@ -15,8 +16,8 @@ class DataPreprocessor:
         return merged_df
 
     # Discretize column using qcut into n_bins, optionally only for top percent of data, and optionally drop original column
-    def discretize_column(self, df, column, n_bins=10, percent=None, drop_original=False):
-        df = df.copy()
+    def discretize_column(self, column, n_bins=10, percent=None, drop_original=False):
+        df = self.games_info.copy()
 
         #cuting only top percent of data
         if percent is not None:
@@ -34,8 +35,9 @@ class DataPreprocessor:
         if drop_original:
             top_rows.drop(columns=[column], inplace=True)
 
-        # Return only the trimmed dataset
-        return top_rows
+        # Update internal games_info and return the trimmed dataset
+        self.games_info = top_rows
+        return None
 
     # convert dataframe to list of tuples (user_idx, item_idx, feature1_idx, ..., rating) and return also number of users, items, features and mapping dicts for users, items and features
     def data_to_tuple(self, df, user_col='user', item_col='ID',
@@ -45,7 +47,10 @@ class DataPreprocessor:
         items = df[item_col].unique()
 
         user2idx = {u: i for i, u in enumerate(users)}
+        # game to index and index to game dictionaries
         game2idx = {g: i for i, g in enumerate(items)}
+        idx2game = {i: g for g, i in game2idx.items()}
+        self.idx2game = idx2game
 
         feature2idx = {}
         for col in feature_col:
@@ -86,5 +91,41 @@ class DataPreprocessor:
         test_entries = data_entries[:n_test]
         train_entries = data_entries[n_test:]
 
-        return train_entries, test_entries
+        """
+        Keep only the records in the test set where the user and item are already in the train set.
+        This is important because the model cannot give recommendations for users or games it hasn't seen during training."""
 
+        train_users = set()
+        train_items = set()
+
+        # izvučemo sve user i item indekse iz traina
+        for entry in train_entries:
+            u_idx, m_idx, *_ = entry
+            train_users.add(u_idx)
+            train_items.add(m_idx)
+
+        # filtriramo test
+        filtered_test = [
+            entry for entry in test_entries
+            if entry[0] in train_users and entry[1] in train_items
+        ]
+
+
+        return train_entries, filtered_test
+
+    def get_game_name(self, m_idx):
+        if self.idx2game is None:
+            return "Unknown"
+        game_id = self.idx2game[m_idx]
+        row = self.games_info.loc[self.games_info["ID"] == game_id]
+        if not row.empty:
+            return row["name"].values[0]
+        return "Unknown"
+
+    def top_games_for_user_name_wraper(self, top ,user_idx):
+        pretty_results = []
+        for m_idx, score in top:
+            name = self.get_game_name(m_idx)
+            pretty_results.append((name, score))
+
+        return pretty_results
