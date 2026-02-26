@@ -44,6 +44,7 @@ class TensorRecommend:
             # Tensor S dimenzija k x k x k x ... (2 + broj featurea)
             self.S = np.random.uniform(0,2, size=(k,) * (2 + self.num_features))
 
+    # Predikcija za jedan unos (iz nekog razloga moras uvalit rating u tuple, ali se ne koristi)
     def predict(self, entry):
         """
         entry: tuple (u_idx, m_idx, feature1_idx, feature2_idx, ..., rating)
@@ -57,6 +58,7 @@ class TensorRecommend:
         einsum_str = f"{subscripts},{','.join(subscripts)}->"
         return np.einsum(einsum_str, self.S, *vecs)
 
+    # Računanje gubitka (loss_nr je samo MSE bez regularizacije, loss je ukupni gubitak s regularizacijom)
     def compute_loss(self):
         loss = 0.0
         for entry in self.data_entries:
@@ -73,15 +75,17 @@ class TensorRecommend:
         loss += self.lambda_ * reg
         return loss_nr, loss
 
+    # Clipping gradijenta na max_norm
     def _clip_grad(self, grad, max_norm):
         norm = np.linalg.norm(grad)
         if norm > max_norm:
             grad = grad * (max_norm / norm)
         return grad
 
+    # Trening za jednu epohu
     def train_epoch(self, t=1, initial_lr=0.01, max_norm=5.0):
         np.random.shuffle(self.data_entries)
-
+        #u jednoj epohi prolazimo kroz sve unose i ažuriramo faktore i tensor S
         for entry in self.data_entries:
             u_idx, m_idx, *feature_indices, r = entry
 
@@ -154,7 +158,7 @@ class TensorRecommend:
         print(f"Epoch Loss: {loss:.4f}, NR Loss: {loss_nr:.4f}, avg error: {np.sqrt(loss_nr/len(self.data_entries)):.4f}")
 
         return t
-
+    # Spremanje modela u .npy datoteke
     def save_model(self, path):
         np.save(os.path.join(path,"U_matrix.npy"), self.U)
         np.save(os.path.join(path,"M_matrix.npy"), self.M)
@@ -162,6 +166,7 @@ class TensorRecommend:
             np.save(os.path.join(path,f"C_matrix_{i}.npy"), C_i)
         np.save(os.path.join(path,"S_tensor.npy"), self.S)
 
+    # Preporuka top N igara za danog korisnika (dani vektor korisnika)
     def top_games(self, user_vec, top_n=10):
         scores = []
 
@@ -185,6 +190,8 @@ class TensorRecommend:
         scores.sort(key=lambda x: x[1], reverse=True)
         return scores[:top_n]
 
+
+    # OVO SE MORA DOVRSITI, TREBA PROVJERITI DA LI RADI KAKO TREBA, JER JE KOMPLICIRANO
     def fit_new_user(self, user_ratings, epochs=50, lr=0.01, max_norm=5.0):
         """
         user_ratings: lista tupleova

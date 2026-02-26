@@ -6,7 +6,7 @@ class DataPreprocessor:
     def __init__(self, games_info, bgg_reviews):
         self.games_info = games_info
         self.bgg_reviews = bgg_reviews
-
+    #merging datasets with inner join on 'ID' column, optionally only with selected features from games_info dataset, and returning merged dataframe
     def merge_datasets(self, featires_to_add=None):
 
         if featires_to_add is not None:
@@ -14,9 +14,11 @@ class DataPreprocessor:
         merged_df = pd.merge(self.bgg_reviews, self.games_info, on='ID', how='inner')
         return merged_df
 
+    # Discretize column using qcut into n_bins, optionally only for top percent of data, and optionally drop original column
     def discretize_column(self, df, column, n_bins=10, percent=None, drop_original=False):
         df = df.copy()
 
+        #cuting only top percent of data
         if percent is not None:
             df.sort_values(by=column, ascending=False, inplace=True)
             n = int(percent * len(df))
@@ -28,13 +30,14 @@ class DataPreprocessor:
         bins = pd.qcut(top_rows[column], q=n_bins, labels=False, duplicates='drop')
         top_rows = top_rows.assign(**{f"{column}_bin": bins})
 
-        # Opcionalno brisanje originalne kolone
+        # Optionally delete original column
         if drop_original:
             top_rows.drop(columns=[column], inplace=True)
 
-        # Vrati samo podrezani dataset
+        # Return only the trimmed dataset
         return top_rows
 
+    # convert dataframe to list of tuples (user_idx, item_idx, feature1_idx, ..., rating) and return also number of users, items, features and mapping dicts for users, items and features
     def data_to_tuple(self, df, user_col='user', item_col='ID',
                   feature_col=None, rating_col='rating'):
 
@@ -71,6 +74,7 @@ class DataPreprocessor:
 
         return data_entries, num_users, num_games, num_features, user2idx, game2idx, feature2idx
 
+    # Split data entries into train and test sets based on test_size and seed, return train and test entries
     def train_test_split(self, data_entries, test_size=0.2, seed=42):
         np.random.seed(seed)
 
